@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
-    public GameObject pawnPrefab1, pawnPrefab2;
+    public GameObject pawnPrefab1, pawnPrefab2, collisionPrefab;
     public GameObject[,] pawns = new GameObject[8, 8];
     public bool isKeyPressAvailable = true;
 
@@ -15,11 +15,26 @@ public class GameManager : MonoBehaviour
 
     int prevX, prevY;
     int newX, newY;
+    bool isRotatingCamera = false;
 
+    Vector3 defaultCamPos, mapCenter;
+    Quaternion defaultCamRot;
+    float defaultCamFOV;
+
+    public GameObject UIRedTurn, UIBlueTurn;
+    public GameObject ClickedParticle, SelectedParticle;
+
+    public GameObject[] lightSource;
     void Start()
     {
         phase = 0;
-        InitializeGame();   
+        InitializeGame();
+        defaultCamPos = Camera.main.transform.position;
+        defaultCamRot = Camera.main.transform.rotation;
+        defaultCamFOV = Camera.main.fieldOfView;
+        mapCenter = new Vector3(3.5f, 0, 3.5f);
+        ClickedParticle.GetComponent<ParticleSystem>().Play();
+        SelectedParticle.GetComponent<ParticleSystem>().Play();
     }
 
     // Update is called once per frame
@@ -28,14 +43,63 @@ public class GameManager : MonoBehaviour
         checkPhaseChange();
         selectPawn();
         actPawn();
+        if (phase == 1)
+        {
+            SelectedParticle.transform.position = selectedObj.transform.position + Vector3.up * 0.5f;
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                if (selectedPawn != null) selectedPawn.recoverAP();
+                TurnOver();
+            }
+        }
+        if (Input.GetKeyDown(KeyCode.Escape)) Application.Quit();
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            for (int i = 0; i < 8; i++)
+                for (int j = 0; j < 8; j++)
+                    if (pawns[i, j] != null) Destroy(pawns[i, j]);
+            InitializeGame();
+        }
+        if (Input.GetMouseButtonDown(1))
+        {
+            Camera.main.transform.position = defaultCamPos;
+            Camera.main.transform.rotation = defaultCamRot;
+        }
+    }
+
+    Vector2 prevClickPos, curClickPos;
+    void LateUpdate()
+    {
+        if (!isRotatingCamera) return;
+        if (Input.GetMouseButtonDown(0))
+        {
+            prevClickPos = Input.mousePosition;
+        }
+        else if (Input.GetMouseButton(0))
+        {
+            curClickPos = Input.mousePosition;
+            Camera.main.transform.RotateAround(mapCenter, Vector3.up, (prevClickPos.x - curClickPos.x) / 10);
+            prevClickPos = curClickPos;
+        }
+    }
+
+    public void TurnOver()
+    {
+        isKeyPressAvailable = true;
+        phase = 0;
+        playingTeam = (playingTeam + 1) % 2;
+        UIControl();
+        for (int i = 0; i < lightSource.Length; i++) lightSource[i].SetActive(true);
     }
 
     void selectPawn()
     {
         if (phase == 0)
         {
+            SelectedParticle.SetActive(false);
             if (Input.GetMouseButtonDown(0))
             {
+                isRotatingCamera = true;
                 RaycastHit hit;
                 Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
@@ -55,6 +119,8 @@ public class GameManager : MonoBehaviour
                         selectedPawn = null;
                         return;
                     }
+                    ClickedParticle.transform.position = selectedObj.transform.position + Vector3.up * 0.5f;
+                    isRotatingCamera = false;
                 }
             }
         }
@@ -75,6 +141,10 @@ public class GameManager : MonoBehaviour
                     {
                         Debug.Log("seleted.");
                         phase = 1;
+                        SelectedParticle.transform.position = selectedObj.transform.position;
+                        SelectedParticle.SetActive(true);
+                        SelectedParticle.GetComponent<ParticleSystem>().Play();
+                        ClickedParticle.transform.position = new Vector3(-10, -10, -10);
                     }
                 }
             }
@@ -130,6 +200,12 @@ public class GameManager : MonoBehaviour
                 pawns[prevX, prevY] = null;
             }
             selectedPawn.attack(targetPawn);
+            Vector3 collPos = (selectedPawn.gameObject.transform.position + targetPawn.gameObject.transform.position) / 2;
+            for (int i = 0; i < lightSource.Length; i++) lightSource[i].SetActive(false);
+            GameObject particle = Instantiate(collisionPrefab);
+            particle.transform.position = collPos + Vector3.up * 0.5f;
+            particle.SetActive(true);
+            particle.GetComponent<ParticleSystem>().Play();
         }
         else
         {
@@ -139,10 +215,28 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    public void UIControl()
+    {
+        switch (playingTeam)
+        {
+            case 0:
+                UIRedTurn.SetActive(true);
+                UIBlueTurn.SetActive(false);
+                break;
+            case 1:
+                UIRedTurn.SetActive(false);
+                UIBlueTurn.SetActive(true);
+                break;
+        }
+    }
+
     void InitializeGame()
     {
+        for (int i = 0; i < lightSource.Length; i++) lightSource[i].SetActive(true);
+        ClickedParticle.transform.position = new Vector3(-10, -10, -10);
+        SelectedParticle.transform.position = new Vector3(-10, -10, -10);
         playingTeam = 0;
-
+        UIControl();
         for (int i = 0; i< 8; i++)
             for (int j = 0; j < 8; j++)
                 pawns[i, j] = null;

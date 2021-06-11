@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
 public class Pawn : MonoBehaviour
 {
     public GameManager manager;
@@ -16,6 +15,8 @@ public class Pawn : MonoBehaviour
     public bool isDead = false;
 
     Rigidbody rigid;
+    public TextMesh powerText, APText, HPText;
+
     void Update()
     {
         if (isMove)
@@ -30,6 +31,7 @@ public class Pawn : MonoBehaviour
             rigid.AddForce(new Vector3(-2, 2, 3), ForceMode.Impulse);
             Invoke("EXEKilled", 0.4f);
         }
+        
     }
 
     public void Initialize(int TEAM, int ActivePoint, int Power, float HealthPoint, int X, int Y)
@@ -46,43 +48,40 @@ public class Pawn : MonoBehaviour
         isMove = false;
         isDead = false;
         gameObject.layer = 10;
+        powerText.text = power.ToString();
+        APText.text = AP.ToString();
+        HPText.text = "¡Ü¡Ü¡Ü¡Ü¡Ü";
     }
 
     public void attack(Pawn pawn)
     {
         manager.isKeyPressAvailable = false;
         pawn.HP -= power;
+        string tmpstr = "";
+        for (int i = 0; i < pawn.HP; i++) tmpstr += "¡Ü";
+        for (int i = 0; i < 5 - pawn.HP; i++) tmpstr += "¡Û";
+        pawn.HPText.text = tmpstr;
         if (pawn.HP > 0) Invoke("EXETellManagerTurnOver", 0.5f);
         leftAP = 0;
+        APText.text = leftAP.ToString();
     }
 
     void EXETellManagerTurnOver()
     {
         recoverAP();
-        manager.isKeyPressAvailable = true;
-        manager.phase = 0;
-        manager.playingTeam = (manager.playingTeam + 1) % 2;
-        string str= "\n";
-        for (int j = 7; j >= 0; j--)
-        {
-            for (int i = 0; i <= 7; i++)
-            {
-                if (manager.pawns[i, j] != null) str += "O";
-                else str += "X";
-            }
-            str += "\n";
-        }
-        Debug.Log(str);
+        manager.TurnOver();
     }
 
     public void recoverAP()
     {
         leftAP = AP;
+        APText.text = leftAP.ToString();
     }
 
     void decreaseAP()
     {
         leftAP--;
+        APText.text = leftAP.ToString();
         if (leftAP <= 0) Invoke("EXETellManagerTurnOver", 0.5f);
         else manager.isKeyPressAvailable = true;
     }
